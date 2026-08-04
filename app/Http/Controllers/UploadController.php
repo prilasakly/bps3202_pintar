@@ -22,12 +22,9 @@ class UploadController extends Controller
 
         // Kalau datang dari tombol "Upload data" di halaman sebuah indikator,
         // indikator itu langsung dipilihkan di form (masih bisa diganti manual).
-        $indikatorTerpilih = null;
-        if ($request->filled('indikator')) {
-            $indikatorTerpilih = Indikator::with('subsidebar')
-                ->where('slug', $request->query('indikator'))
-                ->first();
-        }
+        $indikatorTerpilih = Indikator::with('subsidebar')
+            ->where('slug', $request->query('indikator'))
+            ->first();
 
         // Kalau datang dari tombol "Upload data" di halaman kategori, subsidebar-nya
         // langsung dibuka di form supaya user tinggal pilih indikatornya saja.
@@ -52,6 +49,6 @@ class UploadController extends Controller
             force: $request->boolean('force'),
         );
 
-        return back()->with('hasil_import', $hasil);
+        return back()->with('notifikasi', $hasil);
     }
 }

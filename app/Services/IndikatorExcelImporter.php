@@ -106,7 +106,6 @@ class IndikatorExcelImporter
             $urutanBaris = 0;
 
             for ($row = 3; $row <= $highestRow; $row++) {
-                // Perbaikan: ganti getCellByColumnAndRow(1, $row) menjadi getCell([1, $row])
                 $labelBaris = trim((string) $sheet->getCell([1, $row])->getValue());
 
                 if ($labelBaris === '') {
@@ -137,9 +136,31 @@ class IndikatorExcelImporter
                 $jumlahBaris++;
 
                 foreach ($kolomKolom as $k) {
-                    // Perbaikan: ganti getCellByColumnAndRow($k['index'], $row) menjadi getCell([$k['index'], $row])
                     $cell = $sheet->getCell([$k['index'], $row]);
-                    $rawValue = $cell->getFormattedValue();
+
+                    // 1. Ambil nilai mentah/asli dari Excel
+                    $rawValue = $cell->getValue();
+
+                    // 2. Jika sel berupa rumus/formula, hitung nilainya terlebih dahulu
+                    if (is_string($rawValue) && str_starts_with($rawValue, '=')) {
+                        $rawValue = $cell->getCalculatedValue();
+                    }
+
+                    // 3. Logika penyesuaian angka desimal dan pembersihan zero-padding di depan
+                    if (is_numeric($rawValue)) {
+                        $formatted = (string) $cell->getFormattedValue();
+                        $formattedClean = ltrim($formatted, '0'); // Buang '0' tambahan di depan
+
+                        // Hitung jumlah angka di belakang koma/titik dari format asli
+                        if (preg_match('/[.,](\d+)/', $formattedClean, $matches)) {
+                            $decimals = strlen($matches[1]);
+                            $rawValue = number_format((float) $rawValue, $decimals, '.', '');
+                        } else {
+                            $rawValue = (string) $rawValue;
+                        }
+                    } else {
+                        $rawValue = (string) $rawValue;
+                    }
 
                     // Gunakan updateOrCreate berdasarkan unique composite key
                     $nilai = IndikatorNilai::firstOrNew([
@@ -201,7 +222,6 @@ class IndikatorExcelImporter
         $hasil = [];
 
         for ($col = 2; $col <= self::MAX_KOLOM_SCAN; $col++) {
-            // Perbaikan: ganti getCellByColumnAndRow($col, row) menjadi getCell([$col, row])
             $indukLabel = trim((string) $sheet->getCell([$col, 1])->getValue());
             $kolomLabel = trim((string) $sheet->getCell([$col, 2])->getValue());
 

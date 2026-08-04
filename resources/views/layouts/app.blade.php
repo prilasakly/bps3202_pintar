@@ -86,6 +86,15 @@
 
             {{-- Page content --}}
             <main class="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+                @if (session('notifikasi'))
+                    <div class="mb-6">
+                        @include('partials.alert', [
+                            'status' => session('notifikasi')['status'] ?? 'sukses',
+                            'pesan' => session('notifikasi')['pesan'] ?? '',
+                        ])
+                    </div>
+                @endif
+
                 @yield('content')
             </main>
         </div>

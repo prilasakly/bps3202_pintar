@@ -1,22 +1,25 @@
 @php
-    // Untuk cascading select: subsidebar > indikator, diratakan jadi satu array supaya gampang dipakai Alpine.
+    // Format data subsidebar & indikators
     $subsidebarOptions = $sidebars->flatMap->subsidebars->map(fn ($sub) => [
-        'id' => $sub->id,
+        'id' => (int) $sub->id,
         'nama' => $sub->nama,
-        'indikators' => $sub->indikators->map(fn ($i) => ['id' => $i->id, 'nama' => $i->nama_judul])->values(),
+        'indikators' => $sub->indikators->map(fn ($i) => [
+            'id' => (int) $i->id, 
+            'nama' => $i->nama_judul
+        ])->values(),
     ])->values();
 
-    // Kalau form gagal validasi, cari lagi subsidebar dari indikator_id yang tadi dipilih
-    // supaya dropdown kategori & indikator tetap terisi (bukan kembali kosong).
-    $oldIndikatorId = old('indikator_id');
+    $oldIndikatorId = old('indikator_id') ? (int) old('indikator_id') : null;
     $oldSubsidebarId = null;
+    
     if ($oldIndikatorId) {
-        $foundSub = $subsidebarOptions->first(fn ($s) => collect($s['indikators'])->contains('id', (int) $oldIndikatorId));
+        $foundSub = $subsidebarOptions->first(fn ($s) => collect($s['indikators'])->contains('id', $oldIndikatorId));
         $oldSubsidebarId = $foundSub['id'] ?? null;
     }
 
-    $initSubsidebarId = $oldSubsidebarId ?? $subsidebarTerpilih ?? null;
-    $initIndikatorId = $oldIndikatorId ?? optional($indikatorTerpilih)->id ?? null;
+    // Pastikan nilai default berupa angka/integer atau null
+    $initIndikatorId = $oldIndikatorId ?? ($indikatorTerpilih ? (int) $indikatorTerpilih->id : null);
+    $initSubsidebarId = $oldSubsidebarId ?? ($indikatorTerpilih ? (int) $indikatorTerpilih->subsidebar_id : ($subsidebarTerpilih ? (int) $subsidebarTerpilih : null));
 @endphp
 
 @extends('layouts.app')
@@ -31,13 +34,6 @@
             Upload file <code class="px-1 py-0.5 rounded bg-slate-100 text-slate-600">.xls</code> / <code class="px-1 py-0.5 rounded bg-slate-100 text-slate-600">.xlsx</code>
             hasil ekspor BPS. Pilih dulu kategori datanya, lalu indikator tujuannya supaya lebih mudah ditemukan.
         </p>
-
-        @if (session('hasil_import'))
-            @php($hasil = session('hasil_import'))
-            <div class="mt-6">
-                @include('partials.alert', ['status' => $hasil['status'], 'pesan' => $hasil['pesan']])
-            </div>
-        @endif
 
         @if ($errors->any())
             <div class="mt-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm">
@@ -54,35 +50,46 @@
                  subsidebars: {{ Illuminate\Support\Js::from($subsidebarOptions) }},
                  subsidebarId: {{ Illuminate\Support\Js::from($initSubsidebarId) }},
                  indikatorId: {{ Illuminate\Support\Js::from($initIndikatorId) }},
+                 
                  get indikatorList() {
-                     const grp = this.subsidebars.find(s => s.id === this.subsidebarId);
+                     if (!this.subsidebarId) return [];
+                     const grp = this.subsidebars.find(s => Number(s.id) === Number(this.subsidebarId));
                      return grp ? grp.indikators : [];
                  },
+
+                 onKategoriChange() {
+                     // Reset indikator terpilih HANYA jika kategori diubah manual oleh pengguna
+                     this.indikatorId = null;
+                 }
              }">
 
             <form method="post" action="{{ route('upload.store') }}" enctype="multipart/form-data" class="space-y-5">
                 @csrf
 
-                {{-- Langkah 1: kategori --}}
+                {{-- Langkah 1: Kategori --}}
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">1. Kategori Data</label>
-                    <select x-model.number="subsidebarId" @change="indikatorId = null" required
+                    <select x-model.number="subsidebarId" @change="onKategoriChange()" required
                             class="w-full rounded-lg border border-slate-300 bg-white text-sm px-3 py-2.5 focus:ring-2 focus:ring-bps-green-500/40 focus:border-bps-green-500">
-                        <option :value="null" disabled selected>-- Pilih kategori --</option>
+                        <option :value="null" disabled>-- Pilih kategori --</option>
                         <template x-for="sub in subsidebars" :key="sub.id">
-                            <option :value="sub.id" x-text="sub.nama + ' (' + sub.indikators.length + ')'"></option>
+                            <option :value="sub.id" 
+                                    :selected="Number(sub.id) === Number(subsidebarId)"
+                                    x-text="sub.nama + ' (' + sub.indikators.length + ')'"></option>
                         </template>
                     </select>
                 </div>
 
-                {{-- Langkah 2: indikator, terfilter sesuai kategori terpilih --}}
+                {{-- Langkah 2: Indikator Tujuan --}}
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">2. Indikator Tujuan</label>
                     <select name="indikator_id" x-model.number="indikatorId" :disabled="!subsidebarId" required
                             class="w-full rounded-lg border border-slate-300 bg-white text-sm px-3 py-2.5 focus:ring-2 focus:ring-bps-green-500/40 focus:border-bps-green-500 disabled:bg-slate-50 disabled:text-slate-400">
-                        <option :value="null" disabled selected>-- Pilih indikator --</option>
+                        <option :value="null" disabled>-- Pilih indikator --</option>
                         <template x-for="ind in indikatorList" :key="ind.id">
-                            <option :value="ind.id" x-text="ind.nama"></option>
+                            <option :value="ind.id" 
+                                    :selected="Number(ind.id) === Number(indikatorId)"
+                                    x-text="ind.nama"></option>
                         </template>
                     </select>
                     <p class="mt-1 text-xs text-slate-400" x-show="!subsidebarId">Pilih kategori data dulu di atas.</p>
