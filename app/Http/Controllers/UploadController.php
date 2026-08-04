@@ -2,10 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\UploadIndikatorRequest;
 use App\Models\Indikator;
 use App\Models\Sidebar;
-use App\Services\IndikatorExcelImporter;
 use Illuminate\Http\Request;
 
 class UploadController extends Controller
@@ -34,21 +32,6 @@ class UploadController extends Controller
         return view('upload.create', compact('sidebars', 'indikatorTerpilih', 'subsidebarTerpilih'));
     }
 
-    public function store(UploadIndikatorRequest $request, IndikatorExcelImporter $importer)
-    {
-        $indikator = Indikator::findOrFail($request->integer('indikator_id'));
-        $file = $request->file('file');
-
-        $hasil = $importer->import(
-            indikator: $indikator,
-            filePath: $file->getRealPath(),
-            tahun: $request->integer('tahun'),
-            triwulan: $request->filled('triwulan') ? $request->integer('triwulan') : null,
-            namaFileAsli: $file->getClientOriginalName(),
-            namaSheet: $request->input('sheet'),
-            force: $request->boolean('force'),
-        );
-
-        return back()->with('notifikasi', $hasil);
-    }
+    // Method store() sudah dipindah ke App\Http\Controllers\Api\UploadApiController::store()
+    // (route POST /api/upload) supaya submit upload dari web & mobile lewat jalur RBAC yang sama.
 }

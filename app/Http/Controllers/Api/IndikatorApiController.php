@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Indikator;
 use App\Models\IndikatorNilai;
+use App\Models\IndikatorPeriode;
 use App\Models\Sidebar;
 use Illuminate\Http\Request;
 
@@ -72,6 +73,59 @@ class IndikatorApiController extends Controller
             'baris' => $baris,
             'periode' => $periode,
             'data' => $data,
+        ]);
+    }
+
+    /**
+     * Update metadata indikator (nama judul, satuan, urutan tampil). KHUSUS role ipds
+     * -- dibatasi lewat middleware EnsureHasRole di routes/api.php, bukan di sini.
+     */
+    public function update(Indikator $indikator, Request $request)
+    {
+        $data = $request->validate([
+            'nama_judul' => ['sometimes', 'required', 'string', 'max:255'],
+            'satuan' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'urutan' => ['sometimes', 'integer', 'min:0'],
+        ]);
+
+        $indikator->update($data);
+
+        return response()->json([
+            'message' => "Indikator \"{$indikator->nama_judul}\" berhasil diperbarui.",
+            'indikator' => $indikator->fresh(),
+        ]);
+    }
+
+    /**
+     * Hapus satu indikator beserta seluruh kolom/baris/periode/nilainya (cascade via
+     * foreign key di migration). KHUSUS role ipds.
+     */
+    public function destroy(Indikator $indikator)
+    {
+        $nama = $indikator->nama_judul;
+        $indikator->delete();
+
+        return response()->json([
+            'message' => "Indikator \"{$nama}\" beserta seluruh datanya berhasil dihapus.",
+        ]);
+    }
+
+    /**
+     * Hapus satu periode (tahun/triwulan) saja, indikatornya tetap ada. Versi API dari
+     * IndikatorController::hapusPeriode() (web) -- dipakai supaya mobile app & tombol
+     * hapus di web bisa sama-sama lewat jalur API yang RBAC-nya konsisten. KHUSUS role ipds.
+     */
+    public function hapusPeriode(Indikator $indikator, IndikatorPeriode $periode)
+    {
+        abort_unless($periode->indikator_id === $indikator->id, 404);
+
+        $labelPeriode = $periode->tahun.($periode->triwulan ? ' triwulan '.$periode->triwulan : '');
+
+        $periode->nilai()->delete();
+        $periode->delete();
+
+        return response()->json([
+            'message' => "Data periode {$labelPeriode} untuk indikator \"{$indikator->nama_judul}\" berhasil dihapus.",
         ]);
     }
 }

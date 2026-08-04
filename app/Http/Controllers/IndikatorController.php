@@ -149,27 +149,6 @@ class IndikatorController extends Controller
     }
 
     /**
-     * Hapus satu periode data (tahun/triwulan) beserta seluruh nilainya. Nilai dihapus lebih dulu
-     * secara eksplisit sebelum periode-nya, supaya tidak bergantung pada pengaturan foreign key
-     * cascade di level database. Definisi indikator, kolom, dan baris TIDAK ikut terhapus karena
-     * dipakai bersama oleh periode-periode lain.
-     */
-    public function hapusPeriode(Indikator $indikator, IndikatorPeriode $periode)
-    {
-        abort_unless($periode->indikator_id === $indikator->id, 404);
-
-        $labelPeriode = $periode->tahun.($periode->triwulan ? ' triwulan '.$periode->triwulan : '');
-
-        $periode->nilai()->delete();
-        $periode->delete();
-
-        return back()->with('notifikasi', [
-            'status' => 'sukses',
-            'pesan' => "Data periode {$labelPeriode} untuk indikator \"{$indikator->nama_judul}\" berhasil dihapus.",
-        ]);
-    }
-
-    /**
      * Ambil periode + peta nilai untuk daftar tahun tertentu. Dipakai bersama oleh show() dan
      * export() supaya isi file yang diunduh selalu sama dengan yang sedang ditampilkan di layar.
      *

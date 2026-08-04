@@ -15,9 +15,11 @@
             <p class="mt-2 text-bps-green-50/90 max-w-xl text-sm">
                 Semua indikator dikelompokkan supaya mudah dicari. Pilih kategori di bawah, atau upload data Excel baru.
             </p>
-            <a href="{{ route('upload.create') }}"
-               class="mt-5 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white text-bps-green-700 text-sm font-semibold hover:bg-bps-green-50 active:scale-[0.98] transition shadow-sm">
-                + Upload Data Baru
+            <a href="{{ route('upload.create') }}" x-show="$store.auth.isIpds" x-class="mt-5 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white text-bps-green-700 text-sm font-semibold hover:bg-bps-green-50 active:scale-[0.98] transition shadow-sm">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
+                </svg>
+                Upload Data Baru
             </a>
         </div>
     </div>

@@ -35,6 +35,7 @@
                 </a>
             @endif
             <a href="{{ route('upload.create', ['kategori' => $indikator->subsidebar_id, 'indikator' => $indikator->slug]) }}"
+               x-show="$store.auth.isIpds" x-cloak
             class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-bps-green-500 text-white text-sm font-semibold hover:bg-bps-green-600 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
@@ -44,8 +45,28 @@
         </div>
     </div>
 
+    {{-- Tab: Data vs Kelola --}}
+    <div class="mt-6" x-data="{ tab: 'data' }">
+        <div class="flex items-center gap-1 border-b border-slate-200">
+            <button type="button" @click="tab = 'data'"
+                    class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition"
+                    :class="tab === 'data' ? 'border-bps-green-500 text-bps-green-700' : 'border-transparent text-slate-400 hover:text-slate-600'">
+                Data
+            </button>
+            @if ($semuaPeriode->isNotEmpty())
+                <button type="button" @click="tab = 'kelola'"
+                        class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition"
+                        :class="tab === 'kelola' ? 'border-bps-green-500 text-bps-green-700' : 'border-transparent text-slate-400 hover:text-slate-600'">
+                    Kelola
+                </button>
+            @endif
+        </div>
+
+    {{-- Panel: Data --}}
+    <div x-show="tab === 'data'">
+
     {{-- Filter tahun --}}
-    <form method="get" class="mt-6 flex flex-wrap items-center gap-2">
+    <form method="get" class="mt-4 flex flex-wrap items-center gap-2">
         <span class="text-xs font-semibold text-slate-500 mr-1">Tahun:</span>
         @forelse ($tahunTersediaUnik as $tahun)
             <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition
@@ -115,17 +136,50 @@
     @else
         <div class="mt-6 p-8 rounded-2xl border border-dashed border-slate-300 text-center">
             <p class="text-slate-500">Belum ada data untuk indikator ini.</p>
-            <a href="{{ route('upload.create', ['kategori' => $indikator->subsidebar_id, 'indikator' => $indikator->slug]) }}" class="mt-3 inline-block text-sm font-semibold text-bps-green-600 hover:underline">
+            <a href="{{ route('upload.create', ['kategori' => $indikator->subsidebar_id, 'indikator' => $indikator->slug]) }}" 
+               x-show="$store.auth.isIpds" class="mt-3 inline-block text-sm font-semibold text-bps-green-600 hover:underline">
                 Upload data pertama →
             </a>
         </div>
     @endif
 
-    {{-- Kelola Data per Periode: export & hapus per tahun/triwulan --}}
+    </div>{{-- /Panel: Data --}}
+
+    {{-- Panel: Kelola (export & hapus data per tahun/triwulan) --}}
     @if ($semuaPeriode->isNotEmpty())
-        <div class="mt-8"
-             x-data="{ modalOpen: false, modalLabel: '', modalFormId: null }"
-             @open-delete-modal.window="modalOpen = true; modalLabel = $event.detail.label; modalFormId = $event.detail.formId">
+        <div x-show="tab === 'kelola'" x-cloak class="mt-4"
+             x-data="{
+                modalOpen: false,
+                modalLabel: '',
+                periodeId: null,
+                deleting: false,
+                deleteError: '',
+                async hapusPeriode() {
+                    this.deleting = true;
+                    this.deleteError = '';
+                    try {
+                        const res = await fetch(`/api/indikators/{{ $indikator->slug }}/periode/${this.periodeId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': 'Bearer ' + $store.auth.token,
+                                'Accept': 'application/json',
+                            },
+                        });
+                        const data = await res.json();
+                        if (!res.ok) {
+                            this.deleteError = data.message || 'Gagal menghapus data periode.';
+                            this.deleting = false;
+                            return;
+                        }
+                        // Berhasil dihapus di server, reload halaman supaya tabel & daftar periode ter-update.
+                        window.location.reload();
+                    } catch (e) {
+                        this.deleteError = 'Tidak bisa menghubungi server. Coba lagi.';
+                        this.deleting = false;
+                    }
+                },
+             }"
+             @open-delete-modal.window="modalOpen = true; modalLabel = $event.detail.label; periodeId = $event.detail.periodeId; deleteError = ''">
 
             <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wide">Kelola Data per Periode</h2>
             <p class="text-xs text-slate-400 mt-1">Export atau hapus data untuk tahun/triwulan tertentu saja.</p>
@@ -134,7 +188,6 @@
                 @foreach ($semuaPeriode as $p)
                     @php
                         $labelPeriode = $p->tahun.($p->triwulan ? ' - Triwulan '.$p->triwulan : ' (Tahunan)');
-                        $formId = 'form-hapus-periode-'.$p->id;
                     @endphp
                     <div class="flex items-center justify-between gap-3 px-4 py-3 flex-wrap">
                         <div class="min-w-0">
@@ -154,18 +207,14 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                                 </svg>
                             </a>
-                            <button type="button" title="Hapus periode ini"
-                                    @click="$dispatch('open-delete-modal', { formId: '{{ $formId }}', label: '{{ $labelPeriode }}' })"
+                            {{-- Hapus periode: hanya tim IPDS yang punya akses (dicek juga server-side di API) --}}
+                            <button type="button" title="Hapus periode ini" x-show="$store.auth.isIpds" x-cloak
+                                    @click="$dispatch('open-delete-modal', { periodeId: {{ $p->id }}, label: '{{ $labelPeriode }}' })"
                                     class="p-2 rounded-lg text-rose-500 hover:bg-rose-50 transition">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                 </svg>
                             </button>
-                            <form id="{{ $formId }}" method="POST"
-                                  action="{{ route('indikator.periode.destroy', [$indikator, $p]) }}" class="hidden">
-                                @csrf
-                                @method('DELETE')
-                            </form>
                         </div>
                     </div>
                 @endforeach
@@ -194,18 +243,22 @@
                         Data periode <span class="font-semibold text-slate-700" x-text="modalLabel"></span>
                         untuk indikator ini akan dihapus permanen dan tidak bisa dikembalikan.
                     </p>
+                    <p x-show="deleteError" x-cloak class="mt-3 text-xs text-rose-600" x-text="deleteError"></p>
                     <div class="mt-5 flex gap-2 justify-end">
-                        <button type="button" @click="modalOpen = false"
-                                class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition">
+                        <button type="button" @click="modalOpen = false" :disabled="deleting"
+                                class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition disabled:opacity-60">
                             Batal
                         </button>
-                        <button type="button" @click="document.getElementById(modalFormId).submit()"
-                                class="px-4 py-2 rounded-lg text-sm font-semibold bg-rose-600 text-white hover:bg-rose-700 transition">
-                            Ya, Hapus
+                        <button type="button" @click="hapusPeriode()" :disabled="deleting"
+                                class="px-4 py-2 rounded-lg text-sm font-semibold bg-rose-600 text-white hover:bg-rose-700 transition disabled:opacity-60">
+                            <span x-show="!deleting">Ya, Hapus</span>
+                            <span x-show="deleting" x-cloak>Menghapus...</span>
                         </button>
                     </div>
                 </div>
             </div>
         </div>
     @endif
+
+    </div>{{-- /Tab: Data vs Kelola --}}
 @endsection

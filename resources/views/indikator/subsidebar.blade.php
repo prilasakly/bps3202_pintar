@@ -17,8 +17,12 @@
             <h1 class="text-2xl font-bold text-slate-900 mt-1">{{ $subsidebar->nama }}</h1>
         </div>
         <a href="{{ route('upload.create', ['kategori' => $subsidebar->id]) }}"
-           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-bps-green-500 text-white text-sm font-semibold hover:bg-bps-green-600 transition">
-            + Upload Data Baru
+            x-show="$store.auth.isIpds"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-bps-green-500 text-white text-sm font-semibold hover:bg-bps-green-600 transition">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
+            </svg>
+                Upload Data Baru
         </a>
     </div>
 
