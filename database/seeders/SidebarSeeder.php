@@ -22,6 +22,11 @@ class SidebarSeeder extends Seeder
             ['nama' => 'Buku Tamu', 'icon' => 'book-open', 'type' => 'link', 'route_name' => 'buku-tamu.index'],
             ['nama' => 'Data Makro', 'icon' => 'database', 'type' => 'dropdown', 'route_name' => null],
             ['nama' => 'Tautan Penting', 'icon' => 'link', 'type' => 'link', 'route_name' => 'tautan-penting.index'],
+            // Menu "Kelola User": disembunyikan dari guest (belum login) -- lihat pengecekan
+            // $wajibLogin di partials.sidebar. Semua role yang sudah login boleh MELIHAT daftar
+            // user, tapi tambah/ubah/hapus dibatasi khusus role "superadmin" (lihat EnsureHasRole
+            // di routes/api.php & tombol aksi di resources/views/user/index.blade.php).
+            ['nama' => 'Kelola User', 'icon' => 'users', 'type' => 'link', 'route_name' => 'users.index'],
         ];
 
         foreach ($sidebar as $urutan => $item) {

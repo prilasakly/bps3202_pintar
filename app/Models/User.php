@@ -12,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'nip_lama', 'nip_baru', 'golongan', 'jabatan'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -50,5 +50,14 @@ class User extends Authenticatable
         $roles = is_array($roles) ? $roles : [$roles];
 
         return $this->roles()->whereIn('slug', $roles)->exists();
+    }
+
+    /**
+     * Shortcut untuk cek role "superadmin" -- role tertinggi yang boleh
+     * mengelola akun user lain (tambah/ubah/hapus) lewat menu "Kelola User".
+     */
+    public function isSuperadmin(): bool
+    {
+        return $this->hasRole('superadmin');
     }
 }

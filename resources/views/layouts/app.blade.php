@@ -58,6 +58,10 @@
                     return this.hasRole('ipds');
                 },
 
+                get isSuperadmin() {
+                    return this.hasRole('superadmin');
+                },
+
                 async login(email, password) {
                     this.loading = true;
                     this.error = '';

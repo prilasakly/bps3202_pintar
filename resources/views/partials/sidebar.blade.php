@@ -131,11 +131,11 @@
                     {{-- Menu link biasa, contoh: "Beranda", "Buku Tamu", "Tautan Penting" --}}
                     @php
                         $isActive = $menu->route_name && request()->routeIs($menu->route_name);
-                        // "Tautan Penting" sengaja disembunyikan dari guest (belum login) -- lihat
-                        // permintaan RBAC: guest tidak menampilkan tautan penting. Status login
-                        // dicek di client (Alpine store "auth") karena auth aplikasi ini murni
+                        // "Tautan Penting" & "Kelola User" sengaja disembunyikan dari guest (belum
+                        // login) -- lihat permintaan RBAC: guest tidak menampilkan menu ini. Status
+                        // login dicek di client (Alpine store "auth") karena auth aplikasi ini murni
                         // via token API, bukan session server.
-                        $wajibLogin = $menu->slug === 'tautan-penting';
+                        $wajibLogin = in_array($menu->slug, ['tautan-penting', 'kelola-user']);
                     @endphp
                     <a href="{{ $menu->href() }}"
                        @if ($wajibLogin) x-show="$store.auth.isLoggedIn" x-cloak @endif

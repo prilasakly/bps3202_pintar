@@ -45,5 +45,21 @@ class UserSeeder extends Seeder
             ['name' => 'Administrator PINTAR', 'password' => Hash::make('password')]
         );
         $admin->roles()->sync($roles->pluck('id')->all());
+
+        // Akun superadmin: satu-satunya role yang boleh kelola (tambah/ubah/hapus) akun user
+        // lain lewat menu "Kelola User". Dipisah dari akun "admin" di atas supaya jelas beda
+        // peran -- admin lintas tim untuk urusan data, superadmin khusus urusan akun.
+        $superadmin = User::updateOrCreate(
+            ['email' => 'superadmin@bps.go.id'],
+            [
+                'name' => 'Super Admin PINTAR',
+                'password' => Hash::make('password'),
+                'nip_lama' => null,
+                'nip_baru' => '196001011990031001',
+                'golongan' => 'IV/a',
+                'jabatan' => 'Kepala BPS Kabupaten Sukabumi',
+            ]
+        );
+        $superadmin->roles()->syncWithoutDetaching([$roles['superadmin']->id]);
     }
 }

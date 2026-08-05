@@ -14,6 +14,9 @@ class RoleSeeder extends Seeder
     public function run(): void
     {
         $roles = [
+            // "superadmin" ditaruh paling atas karena role tertinggi di aplikasi ini --
+            // satu-satunya role yang boleh tambah/ubah/hapus akun user lewat menu "Kelola User".
+            'superadmin' => 'Super Admin',
             'ipds' => 'IPDS',
             'sosial' => 'Statistik Sosial',
             'distribusi' => 'Statistik Distribusi',

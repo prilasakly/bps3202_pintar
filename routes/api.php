@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthApiController;
 use App\Http\Controllers\Api\IndikatorApiController;
 use App\Http\Controllers\Api\UploadApiController;
+use App\Http\Controllers\Api\UserApiController;
 use App\Http\Middleware\EnsureHasRole;
 use Illuminate\Support\Facades\Route;
 
@@ -45,4 +46,30 @@ Route::middleware(['auth:sanctum', EnsureHasRole::class.':ipds'])->group(functio
     Route::patch('/indikators/{indikator:slug}', [IndikatorApiController::class, 'update']);
     Route::delete('/indikators/{indikator:slug}', [IndikatorApiController::class, 'destroy']);
     Route::delete('/indikators/{indikator:slug}/periode/{periode}', [IndikatorApiController::class, 'hapusPeriode']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Kelola User
+|--------------------------------------------------------------------------
+| Lihat daftar user: WAJIB login, tapi role apa saja boleh (bukan cuma ipds/
+| superadmin). Guest tetap ditolak karena tetap dibungkus auth:sanctum.
+*/
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/users', [UserApiController::class, 'index']);
+});
+
+/*
+| Tambah/ubah/hapus user: WAJIB login DAN berperan "superadmin". Role lain
+| (termasuk ipds) tetap read-only untuk data user -- lihat grup route di atas.
+*/
+Route::middleware(['auth:sanctum', EnsureHasRole::class.':superadmin'])->group(function () {
+    Route::post('/users', [UserApiController::class, 'store']);
+    Route::put('/users/{user}', [UserApiController::class, 'update']);
+    Route::patch('/users/{user}', [UserApiController::class, 'update']);
+    Route::delete('/users/{user}', [UserApiController::class, 'destroy']);
+
+    // Upload user batch pakai Excel + tombol download templatenya.
+    Route::get('/users/template', [UserApiController::class, 'template']);
+    Route::post('/users/import', [UserApiController::class, 'import']);
 });
