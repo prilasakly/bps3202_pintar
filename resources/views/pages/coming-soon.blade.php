@@ -5,12 +5,14 @@
 @section('page-title', $judul)
 
 @section('content')
-<div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-950 via-bps-green-900 to-slate-900 p-6 sm:p-8 text-white shadow-md my-2">
+{{-- Gunakan min-h-[calc(100vh-180px)] agar tingginya pas memenuhi sisa layar tanpa merusak layout lain --}}
+<div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-950 via-bps-green-900 to-slate-900 p-6 sm:p-8 text-white shadow-md flex flex-col justify-center items-center min-h-[calc(100vh-180px)]">
+    
     {{-- Background Glow --}}
     <div class="absolute -top-20 -right-20 w-72 h-72 bg-bps-green-500/15 rounded-full blur-3xl pointer-events-none"></div>
     <div class="absolute -bottom-20 -left-20 w-64 h-64 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none"></div>
 
-    <div class="relative z-10 max-w-xl mx-auto text-center py-2">
+    <div class="relative z-10 max-w-xl mx-auto text-center py-2 w-full">
         {{-- Badge Status --}}
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-emerald-300 text-[11px] font-medium mb-4">
             <span class="relative flex h-2 w-2">
