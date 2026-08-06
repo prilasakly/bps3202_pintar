@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\BuildsTableQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ImportUsersRequest;
 use App\Http\Requests\StoreUserRequest;
@@ -9,22 +10,38 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
 use App\Services\UserExcelImporter;
 use App\Services\UserExcelTemplateGenerator;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class UserApiController extends Controller
 {
+    use BuildsTableQuery;
+
     /**
-     * Daftar seluruh user beserta role-nya. Bisa diakses semua role yang SUDAH LOGIN
-     * (read-only) -- dibatasi middleware auth:sanctum saja di routes/api.php, TANPA
-     * EnsureHasRole, karena "semua yang login boleh lihat" (lihat permintaan RBAC).
+     * Daftar user beserta role-nya, dengan search + sort + pagination (lihat
+     * BuildsTableQuery). Bisa diakses semua role yang SUDAH LOGIN (read-only) --
+     * dibatasi middleware auth:sanctum saja di routes/api.php, TANPA EnsureHasRole,
+     * karena "semua yang login boleh lihat" (lihat permintaan RBAC).
+     *
+     * Query string: ?search=...&sort_by=name|email|nip_lama|nip_baru|golongan|jabatan|created_at
+     * &sort_dir=asc|desc&per_page=10|25|50|100&page=1
      */
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::with('roles:id,nama,slug')
-            ->orderBy('name')
-            ->get(['id', 'name', 'email', 'nip_lama', 'nip_baru', 'golongan', 'jabatan', 'created_at'])
-            ->map(fn (User $user) => $this->formatUser($user));
+        $query = User::query()->with('roles:id,nama,slug');
+
+        /** @var \Illuminate\Pagination\LengthAwarePaginator $users */
+        $users = $this->paginateTable($query, $request, [
+            'searchable' => ['name', 'email', 'nip_lama', 'nip_baru', 'golongan', 'jabatan'],
+            'search_relations' => ['roles' => ['nama', 'slug']],
+            'sortable' => ['name', 'email', 'nip_lama', 'nip_baru', 'golongan', 'jabatan', 'created_at'],
+            'default_sort' => 'name',
+            'default_dir' => 'asc',
+        ]);
+
+        // Now IDE knows getCollection() exists!
+        $users->getCollection()->transform(fn (User $user) => $this->formatUser($user));
 
         return response()->json($users);
     }

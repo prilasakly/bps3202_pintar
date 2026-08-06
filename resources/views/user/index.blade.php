@@ -42,7 +42,7 @@
 
             {{-- Tombol tambah/import user: khusus superadmin --}}
             <div class="flex items-center justify-between gap-3 mb-4 flex-wrap" x-show="$store.auth.isSuperadmin" x-cloak>
-                <span class="text-xs text-slate-400" x-text="users.length + ' user terdaftar'"></span>
+                <span class="text-xs text-slate-400" x-text="total + ' user terdaftar'"></span>
                 <div class="inline-flex items-center gap-2 flex-wrap">
                     <button type="button" @click="downloadTemplate()" :disabled="downloadingTemplate"
                             class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-300 text-slate-600 text-xs font-semibold hover:bg-slate-50 active:scale-[0.98] transition disabled:opacity-60">
@@ -68,30 +68,33 @@
                 </div>
             </div>
 
+            {{-- Search + pilihan jumlah baris per halaman --}}
+            <x-table.toolbar placeholder="Cari nama, email, NIP, golongan, jabatan, atau role..." />
+
             {{-- Loading state --}}
             <div x-show="loading" x-cloak class="p-8 text-center text-slate-400 text-sm">Memuat daftar user...</div>
 
             {{-- Load error --}}
-            <div x-show="loadError" x-cloak class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm" x-text="loadError"></div>
+            <div x-show="error" x-cloak class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm" x-text="error"></div>
 
             {{-- Tabel user --}}
-            <div x-show="!loading && !loadError" x-cloak class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div x-show="!loading && !error" x-cloak class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead>
                             <tr class="bg-bps-green-600 text-white text-xs">
-                                <th class="px-4 py-3 text-left font-semibold">Nama</th>
-                                <th class="px-4 py-3 text-left font-semibold">Email</th>
-                                <th class="px-4 py-3 text-left font-semibold">NIP Lama</th>
-                                <th class="px-4 py-3 text-left font-semibold">NIP Baru</th>
-                                <th class="px-4 py-3 text-left font-semibold">Golongan</th>
-                                <th class="px-4 py-3 text-left font-semibold">Jabatan</th>
+                                <x-table.sortable-th column="name">Nama</x-table.sortable-th>
+                                <x-table.sortable-th column="email">Email</x-table.sortable-th>
+                                <x-table.sortable-th column="nip_lama">NIP Lama</x-table.sortable-th>
+                                <x-table.sortable-th column="nip_baru">NIP Baru</x-table.sortable-th>
+                                <x-table.sortable-th column="golongan">Golongan</x-table.sortable-th>
+                                <x-table.sortable-th column="jabatan">Jabatan</x-table.sortable-th>
                                 <th class="px-4 py-3 text-left font-semibold">Role</th>
                                 <th class="px-4 py-3 text-right font-semibold" x-show="$store.auth.isSuperadmin" x-cloak>Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <template x-for="user in users" :key="user.id">
+                            <template x-for="user in items" :key="user.id">
                                 <tr class="odd:bg-white even:bg-bps-green-50/40 hover:bg-bps-orange-50/60 transition-colors border-t border-slate-100">
                                     <td class="px-4 py-2.5 font-medium text-slate-700" x-text="user.name"></td>
                                     <td class="px-4 py-2.5 text-slate-600" x-text="user.email"></td>
@@ -125,12 +128,16 @@
                                     </td>
                                 </tr>
                             </template>
-                            <tr x-show="users.length === 0">
-                                <td colspan="8" class="px-4 py-8 text-center text-slate-400">Belum ada user.</td>
+                            <tr x-show="items.length === 0">
+                                <td colspan="8" class="px-4 py-8 text-center text-slate-400">
+                                    <span x-text="search ? 'Tidak ada user yang cocok dengan pencarian.' : 'Belum ada user.'"></span>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+
+                <x-table.pagination />
             </div>
         </div>
     </template>
@@ -358,11 +365,20 @@
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('userManagement', (roleOptions) => ({
+        // Tabel user (search + sort + pagination) dipasok oleh mixin generik pintarTableFactory
+        // (lihat resources/views/layouts/app.blade.php) -- di sini cuma disambungkan ke endpoint
+        // /api/users. Properti items/loading/error/search/page/perPage/total/dst semuanya datang
+        // dari sana, tinggal dipakai di HTML di atas.
+        ...window.pintarTableFactory({
+            endpoint: '/api/users',
+            defaultSort: 'name',
+            defaultDir: 'asc',
+            perPage: 10,
+            errorMessage: 'Tidak bisa memuat daftar user. Coba muat ulang halaman.',
+        }),
+        _tableStarted: false,
+
         roleOptions: roleOptions,
-        users: [],
-        loading: false,
-        loadError: '',
-        loaded: false,
 
         showModal: false,
         editingId: null,
@@ -380,30 +396,17 @@ document.addEventListener('alpine:init', () => {
         downloadingTemplate: false,
 
         init() {
-            if (this.$store.auth.isLoggedIn) this.loadUsers();
+            if (this.$store.auth.isLoggedIn) this.startTable();
             this.$watch('$store.auth.isLoggedIn', (loggedIn) => {
-                if (loggedIn && !this.loaded) this.loadUsers();
+                if (loggedIn && !this._tableStarted) this.startTable();
             });
         },
 
-        async loadUsers() {
-            this.loading = true;
-            this.loadError = '';
-            try {
-                const res = await fetch('/api/users', {
-                    headers: {
-                        'Authorization': 'Bearer ' + this.$store.auth.token,
-                        'Accept': 'application/json',
-                    },
-                });
-                if (!res.ok) throw new Error('Gagal memuat daftar user.');
-                this.users = await res.json();
-                this.loaded = true;
-            } catch (e) {
-                this.loadError = 'Tidak bisa memuat daftar user. Coba muat ulang halaman.';
-            } finally {
-                this.loading = false;
-            }
+        // initTable() (dari mixin) mendaftarkan watcher search/perPage lalu langsung fetch
+        // pertama kali -- dipanggil manual di sini supaya nunggu user login dulu.
+        startTable() {
+            this._tableStarted = true;
+            this.initTable();
         },
 
         resetForm() {
@@ -476,7 +479,7 @@ document.addEventListener('alpine:init', () => {
 
                 this.pesan = { status: 'sukses', pesan: data.message };
                 this.showModal = false;
-                await this.loadUsers();
+                await this.fetchData();
             } catch (e) {
                 this.pesan = { status: 'gagal', pesan: 'Tidak bisa menghubungi server. Coba lagi.' };
             } finally {
@@ -501,7 +504,7 @@ document.addEventListener('alpine:init', () => {
                     return;
                 }
                 this.pesan = { status: 'sukses', pesan: data.message };
-                await this.loadUsers();
+                await this.fetchData();
             } catch (e) {
                 this.pesan = { status: 'gagal', pesan: 'Tidak bisa menghubungi server. Coba lagi.' };
             } finally {
@@ -546,7 +549,7 @@ document.addEventListener('alpine:init', () => {
                 this.importResult = data;
 
                 if (data.jumlah_berhasil > 0) {
-                    await this.loadUsers();
+                    await this.fetchData();
                 }
             } catch (e) {
                 this.importResult = {

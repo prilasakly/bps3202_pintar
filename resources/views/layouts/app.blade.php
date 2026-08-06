@@ -120,6 +120,271 @@
         });
     </script>
 
+    <script defer>
+        // === Sistem tabel generik (search + sort + pagination) =============================
+        // Dua "mixin" plain-JS yang bisa dipakai ulang di halaman mana pun yang punya tabel
+        // dengan data banyak, tinggal manggil salah satu di x-data sesuai kebutuhan:
+        //
+        // 1) window.pintarTableFactory(config)
+        //    Buat tabel yang datanya diambil dari API (search/sort/pagination diproses di
+        //    server lewat trait BuildsTableQuery). Cocok kalau datanya besar / bisa terus
+        //    bertambah. Bisa dipakai langsung: x-data="dataTable({ endpoint: '/api/users' })",
+        //    ATAU di-spread ke komponen Alpine lain yang butuh state tambahan (lihat contoh
+        //    "userManagement" di resources/views/user/index.blade.php):
+        //        Alpine.data('userManagement', () => ({
+        //            ...window.pintarTableFactory({ endpoint: '/api/users', defaultSort: 'name' }),
+        //            // ...state & method khusus halaman itu...
+        //        }))
+        //
+        //    Konsumen HARUS memanggil this.initTable() sendiri (di dalam init() masing-masing)
+        //    supaya bisa dikontrol kapan fetch pertama kali jalan (misal nunggu user login dulu).
+        //
+        //    Properti yang tersedia buat dipakai di HTML: items, loading, error, search, page,
+        //    perPage, perPageOptions, total, from, to, lastPage, pageNumbers, sortBy, sortDir.
+        //    Method: initTable(), fetchData(), sort(column), sortIcon(column), goToPage(n).
+        //
+        // 2) window.pintarClientTableFactory(rows, options)
+        //    Buat tabel yang datanya sudah lengkap ada di HTML/JS (di-render server lalu di-
+        //    embed sebagai JSON, tanpa fetch API terpisah) -- cocok untuk data yang sudah pasti
+        //    kecil/sedang dan sudah kepalang di-load, misal tabel pivot indikator per kecamatan.
+        //    Search/sort/pagination-nya full diproses di browser (client-side).
+        //
+        //    Method & properti yang tersedia sama seperti di atas (tanpa loading/error/fetchData,
+        //    karena tidak ada request jaringan).
+        window.pintarTableFactory = function (config = {}) {
+            return {
+                items: [],
+                loading: false,
+                error: '',
+                search: '',
+                sortBy: config.defaultSort ?? null,
+                sortDir: config.defaultDir === 'desc' ? 'desc' : 'asc',
+                page: 1,
+                perPage: config.perPage ?? 10,
+                perPageOptions: config.perPageOptions ?? [10, 25, 50, 100],
+                total: 0,
+                lastPage: 1,
+                from: 0,
+                to: 0,
+                _endpoint: config.endpoint,
+                _authRequired: config.authRequired !== false,
+                _extraParams: config.extraParams ?? {},
+                _searchTimer: null,
+
+                // Panggil ini sendiri di init() halaman yang makai (bukan otomatis), supaya
+                // fetch pertama bisa ditunda sampai kondisi tertentu terpenuhi (mis. sudah login).
+                initTable() {
+                    this.$watch('search', () => {
+                        this.page = 1;
+                        clearTimeout(this._searchTimer);
+                        this._searchTimer = setTimeout(() => this.fetchData(), 350);
+                    });
+                    this.$watch('perPage', () => {
+                        this.page = 1;
+                        this.fetchData();
+                    });
+                    this.fetchData();
+                },
+
+                sort(column) {
+                    if (!column) return;
+                    if (this.sortBy === column) {
+                        this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        this.sortBy = column;
+                        this.sortDir = 'asc';
+                    }
+                    this.page = 1;
+                    this.fetchData();
+                },
+
+                sortIcon(column) {
+                    if (this.sortBy !== column) return '⇅';
+                    return this.sortDir === 'asc' ? '↑' : '↓';
+                },
+
+                goToPage(p) {
+                    p = Number(p);
+                    if (!p || p < 1 || p > this.lastPage || p === this.page) return;
+                    this.page = p;
+                    this.fetchData();
+                },
+
+                get pageNumbers() {
+                    return pintarPageNumbers(this.page, this.lastPage);
+                },
+
+                async fetchData() {
+                    if (!this._endpoint) return;
+                    this.loading = true;
+                    this.error = '';
+                    try {
+                        const params = new URLSearchParams();
+                        params.set('page', this.page);
+                        params.set('per_page', this.perPage);
+                        if (this.search) params.set('search', this.search);
+                        if (this.sortBy) {
+                            params.set('sort_by', this.sortBy);
+                            params.set('sort_dir', this.sortDir);
+                        }
+                        Object.entries(this._extraParams || {}).forEach(([key, value]) => {
+                            if (value !== null && value !== undefined && value !== '') {
+                                params.set(key, value);
+                            }
+                        });
+
+                        const headers = { 'Accept': 'application/json' };
+                        if (this._authRequired) {
+                            headers['Authorization'] = 'Bearer ' + Alpine.store('auth').token;
+                        }
+
+                        const res = await fetch(this._endpoint + '?' + params.toString(), { headers });
+                        if (!res.ok) throw new Error('Gagal memuat data.');
+                        const data = await res.json();
+
+                        this.items = data.data ?? [];
+                        this.total = data.total ?? this.items.length;
+                        this.lastPage = data.last_page ?? 1;
+                        this.from = data.from ?? (this.items.length ? 1 : 0);
+                        this.to = data.to ?? this.items.length;
+                        this.page = data.current_page ?? this.page;
+                    } catch (e) {
+                        this.error = config.errorMessage ?? 'Tidak bisa memuat data. Coba muat ulang halaman.';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+            };
+        };
+
+        window.pintarClientTableFactory = function (rows = [], options = {}) {
+            return {
+                _allRows: rows ?? [],
+                search: '',
+                searchKeys: options.searchKeys ?? ['label'],
+                sortBy: options.defaultSort ?? null,
+                sortDir: options.defaultDir === 'desc' ? 'desc' : 'asc',
+                page: 1,
+                perPage: options.perPage ?? 10,
+                perPageOptions: options.perPageOptions ?? [10, 25, 50, 100],
+
+                init() {
+                    this.$watch('search', () => { this.page = 1; });
+                    this.$watch('perPage', () => { this.page = 1; });
+                },
+
+                _toNumber(v) {
+                    if (v === null || v === undefined || v === '') return null;
+                    let s = String(v).trim();
+                    // Format Indonesia (titik ribuan, koma desimal) misal "1.234,5"
+                    if (/^-?\d{1,3}(\.\d{3})*(,\d+)?$/.test(s)) {
+                        s = s.replace(/\./g, '').replace(',', '.');
+                    } else {
+                        s = s.replace(',', '.');
+                    }
+                    const n = parseFloat(s);
+                    return isNaN(n) ? null : n;
+                },
+
+                _valueFor(row, key) {
+                    if (key === 'label') return row.label;
+                    return row.cells ? row.cells[key] : row[key];
+                },
+
+                get filteredRows() {
+                    const term = this.search.trim().toLowerCase();
+                    if (!term) return this._allRows;
+                    return this._allRows.filter((row) => {
+                        const haystack = [];
+                        this.searchKeys.forEach((k) => haystack.push(row[k]));
+                        if (row.cells) haystack.push(...Object.values(row.cells));
+                        return haystack.some((v) => v !== null && v !== undefined && String(v).toLowerCase().includes(term));
+                    });
+                },
+
+                get sortedRows() {
+                    const rows = [...this.filteredRows];
+                    if (!this.sortBy) return rows;
+                    const dir = this.sortDir === 'desc' ? -1 : 1;
+                    rows.sort((a, b) => {
+                        const va = this._valueFor(a, this.sortBy);
+                        const vb = this._valueFor(b, this.sortBy);
+                        const na = this._toNumber(va);
+                        const nb = this._toNumber(vb);
+                        if (na !== null && nb !== null) return (na - nb) * dir;
+                        return String(va ?? '').localeCompare(String(vb ?? ''), 'id') * dir;
+                    });
+                    return rows;
+                },
+
+                get total() { return this.filteredRows.length; },
+                get lastPage() { return Math.max(1, Math.ceil(this.total / this.perPage)); },
+                get from() { return this.total === 0 ? 0 : (this.page - 1) * this.perPage + 1; },
+                get to() { return Math.min(this.page * this.perPage, this.total); },
+                get pageItems() {
+                    const start = (this.page - 1) * this.perPage;
+                    return this.sortedRows.slice(start, start + this.perPage);
+                },
+                get pageNumbers() {
+                    return pintarPageNumbers(this.page, this.lastPage);
+                },
+
+                sort(key) {
+                    if (this.sortBy === key) {
+                        this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        this.sortBy = key;
+                        this.sortDir = 'asc';
+                    }
+                    this.page = 1;
+                },
+                sortIcon(key) {
+                    if (this.sortBy !== key) return '⇅';
+                    return this.sortDir === 'asc' ? '↑' : '↓';
+                },
+                goToPage(p) {
+                    p = Number(p);
+                    if (!p || p < 1 || p > this.lastPage) return;
+                    this.page = p;
+                },
+            };
+        };
+
+        // Helper bersama: bikin daftar nomor halaman dengan "..." kalau halamannya banyak,
+        // dipakai baik oleh pintarTableFactory maupun pintarClientTableFactory.
+        function pintarPageNumbers(current, total) {
+            const delta = 1;
+            const range = [];
+            for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) {
+                range.push(i);
+            }
+            const withDots = [];
+            if (current - delta > 2) {
+                withDots.push(1, '...');
+            } else {
+                withDots.push(1);
+            }
+            withDots.push(...range);
+            if (current + delta < total - 1) {
+                withDots.push('...', total);
+            } else if (total > 1) {
+                withDots.push(total);
+            }
+            return [...new Set(withDots)];
+        }
+
+        // Komponen siap-pakai buat tabel read-only sederhana yang cukup pakai fetch API polos
+        // (tanpa CRUD/state tambahan): <div x-data="dataTable({ endpoint: '/api/...' })">
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('dataTable', (config) => ({
+                ...window.pintarTableFactory(config),
+                init() {
+                    this.initTable();
+                },
+            }));
+        });
+    </script>
+
     <style>
         [x-cloak] { display: none !important; }
         body { font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; }

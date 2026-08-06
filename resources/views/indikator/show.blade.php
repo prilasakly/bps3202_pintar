@@ -84,50 +84,73 @@
 
     {{-- Tabel Pivot --}}
     @if ($periodeDipilih->isNotEmpty())
-        <div class="mt-6 overflow-x-auto rounded-2xl border border-slate-200 custom-scrollbar">
-            <table class="min-w-full text-sm">
-                <thead>
-                    <tr class="bg-bps-green-600 text-white">
-                        <th rowspan="2" class="px-4 py-3 text-left font-semibold sticky left-0 bg-bps-green-600">
-                            Kecamatan
-                        </th>
-                        @foreach ($periodeDipilih as $p)
-                            <th colspan="{{ $indikator->kolom->count() }}" class="px-4 py-2 text-center font-semibold border-l border-bps-green-500">
-                                {{ $p->tahun }}{{ $p->triwulan ? ' - TW'.$p->triwulan : '' }}
-                            </th>
-                        @endforeach
-                    </tr>
-                    <tr class="bg-bps-green-700 text-white text-xs">
-                        @foreach ($periodeDipilih as $p)
-                            @foreach ($indikator->kolom as $k)
-                                <th class="px-3 py-2 text-center font-medium border-l border-bps-green-600">{{ $k->kolom_label }}</th>
+        @php
+            // Data pivotnya (kecamatan x tahun x kolom) sudah pasti kecil -- jumlah baris cuma
+            // sebanyak kecamatan -- makanya aman diproses PENUH di browser (search/sort/pagination
+            // client-side) tanpa perlu bikin endpoint API baru. Bentuk datanya di-flatten dulu di
+            // sini biar gampang dibaca sama pintarClientTableFactory (lihat layouts/app.blade.php).
+            $pivotRows = $indikator->baris->map(function ($baris) use ($periodeDipilih, $indikator, $nilaiMap) {
+                $cells = [];
+                foreach ($periodeDipilih as $p) {
+                    foreach ($indikator->kolom as $k) {
+                        $cells[$p->id.'-'.$k->id] = $nilaiMap[$baris->id][$p->id][$k->id] ?? null;
+                    }
+                }
+
+                return ['label' => $baris->baris_label, 'cells' => $cells];
+            })->values();
+        @endphp
+        <div class="mt-6"
+             x-data="pintarClientTableFactory({{ Illuminate\Support\Js::from($pivotRows) }}, { perPage: 10, defaultSort: 'label' })">
+
+            {{-- Search + pilihan jumlah baris per halaman --}}
+            <x-table.toolbar placeholder="Cari nama kecamatan..." />
+
+            <div class="overflow-x-auto rounded-2xl border border-slate-200 custom-scrollbar">
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="bg-bps-green-600 text-white">
+                            <x-table.sortable-th column="label" rowspan="2" class="sticky left-0 bg-bps-green-600">
+                                Kecamatan
+                            </x-table.sortable-th>
+                            @foreach ($periodeDipilih as $p)
+                                <th colspan="{{ $indikator->kolom->count() }}" class="px-4 py-2 text-center font-semibold border-l border-bps-green-500">
+                                    {{ $p->tahun }}{{ $p->triwulan ? ' - TW'.$p->triwulan : '' }}
+                                </th>
                             @endforeach
-                        @endforeach
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    @forelse ($indikator->baris as $baris)
-                        <tr class="odd:bg-white even:bg-bps-green-50/40 hover:bg-bps-orange-50/60 transition-colors">
-                            <td class="px-4 py-2.5 font-medium text-slate-700 sticky left-0 bg-inherit">
-                                {{ $baris->baris_label }}
-                            </td>
+                        </tr>
+                        <tr class="bg-bps-green-700 text-white text-xs">
                             @foreach ($periodeDipilih as $p)
                                 @foreach ($indikator->kolom as $k)
-                                    <td class="px-3 py-2.5 text-right text-slate-600 border-l border-slate-100">
-                                        {{ $nilaiMap[$baris->id][$p->id][$k->id] ?? '-' }}
-                                    </td>
+                                    <x-table.sortable-th column="{{ $p->id }}-{{ $k->id }}" align="right" class="border-l border-bps-green-600">
+                                        {{ $k->kolom_label }}
+                                    </x-table.sortable-th>
                                 @endforeach
                             @endforeach
                         </tr>
-                    @empty
-                        <tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <template x-for="row in pageItems" :key="row.label">
+                            <tr class="odd:bg-white even:bg-bps-green-50/40 hover:bg-bps-orange-50/60 transition-colors">
+                                <td class="px-4 py-2.5 font-medium text-slate-700 sticky left-0 bg-inherit" x-text="row.label"></td>
+                                @foreach ($periodeDipilih as $p)
+                                    @foreach ($indikator->kolom as $k)
+                                        <td class="px-3 py-2.5 text-right text-slate-600 border-l border-slate-100"
+                                            x-text="row.cells['{{ $p->id }}-{{ $k->id }}'] ?? '-'"></td>
+                                    @endforeach
+                                @endforeach
+                            </tr>
+                        </template>
+                        <tr x-show="pageItems.length === 0">
                             <td colspan="{{ 1 + $periodeDipilih->count() * max($indikator->kolom->count(), 1) }}" class="px-4 py-8 text-center text-slate-400">
-                                Belum ada baris data.
+                                <span x-text="search ? 'Tidak ada kecamatan yang cocok dengan pencarian.' : 'Belum ada baris data.'"></span>
                             </td>
                         </tr>
-                    @endforelse
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+
+                <x-table.pagination />
+            </div>
         </div>
     @elseif ($tahunTersediaUnik->isNotEmpty())
         <div class="mt-6 p-8 rounded-2xl border border-dashed border-slate-300 text-center">
