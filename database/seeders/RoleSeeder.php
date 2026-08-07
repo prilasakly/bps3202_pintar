@@ -15,8 +15,11 @@ class RoleSeeder extends Seeder
     {
         $roles = [
             // "superadmin" ditaruh paling atas karena role tertinggi di aplikasi ini --
-            // satu-satunya role yang boleh tambah/ubah/hapus akun user lewat menu "Kelola User".
+            // selalu dianggap punya semua permission (lihat User::hasPermission()).
             'superadmin' => 'Super Admin',
+            // "admin" -- role administratif di bawah superadmin, dipakai antara lain untuk
+            // ikut mengelola halaman "Kelola Data" (lihat PermissionSeeder).
+            'admin' => 'Admin',
             'ipds' => 'IPDS',
             'sosial' => 'Statistik Sosial',
             'distribusi' => 'Statistik Distribusi',

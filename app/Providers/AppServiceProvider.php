@@ -31,7 +31,7 @@ class AppServiceProvider extends ServiceProvider
                     $q->orderBy('urutan')->withCount('indikators');
                 }, 'subsidebars.indikators:id,subsidebar_id,nama_judul,slug'])
                     ->orderBy('urutan')
-                    ->get(['id', 'nama', 'slug', 'icon', 'type', 'route_name', 'url', 'urutan'])
+                    ->get(['id', 'nama', 'grup', 'slug', 'icon', 'type', 'route_name', 'url', 'urutan'])
             );
         });
     }

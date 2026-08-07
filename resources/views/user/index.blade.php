@@ -14,7 +14,7 @@
     <p class="text-slate-500 text-sm max-w-2xl">
         Daftar akun user PINTAR beserta data kepegawaian dan role/tim masing-masing.
         Semua user yang login bisa melihat daftar ini; tambah, ubah, dan hapus user
-        hanya bisa dilakukan oleh role <strong>Super Admin</strong>.
+        dibatasi hak akses <strong>Kelola User</strong> (diatur lewat halaman Kelola Hak Akses).
     </p>
 
     {{-- Guest: belum login sama sekali --}}
@@ -41,7 +41,7 @@
             </template>
 
             {{-- Tombol tambah/import user: khusus superadmin --}}
-            <div class="flex items-center justify-between gap-3 mb-4 flex-wrap" x-show="$store.auth.isSuperadmin" x-cloak>
+            <div class="flex items-center justify-between gap-3 mb-4 flex-wrap" x-show="$store.auth.can('users.manage')" x-cloak>
                 <span class="text-xs text-slate-400" x-text="total + ' user terdaftar'"></span>
                 <div class="inline-flex items-center gap-2 flex-wrap">
                     <button type="button" @click="downloadTemplate()" :disabled="downloadingTemplate"
@@ -90,7 +90,7 @@
                                 <x-table.sortable-th column="golongan">Golongan</x-table.sortable-th>
                                 <x-table.sortable-th column="jabatan">Jabatan</x-table.sortable-th>
                                 <th class="px-4 py-3 text-left font-semibold">Role</th>
-                                <th class="px-4 py-3 text-right font-semibold" x-show="$store.auth.isSuperadmin" x-cloak>Aksi</th>
+                                <th class="px-4 py-3 text-right font-semibold" x-show="$store.auth.can('users.manage')" x-cloak>Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -110,7 +110,7 @@
                                             <span x-show="user.roles.length === 0" class="text-[10px] text-slate-400 italic">Belum ada role</span>
                                         </div>
                                     </td>
-                                    <td class="px-4 py-2.5 text-right" x-show="$store.auth.isSuperadmin" x-cloak>
+                                    <td class="px-4 py-2.5 text-right" x-show="$store.auth.can('users.manage')" x-cloak>
                                         <div class="inline-flex items-center gap-1.5">
                                             <button type="button" @click="openEdit(user)"
                                                     class="p-1.5 rounded-lg text-bps-blue-600 hover:bg-bps-blue-50 transition" title="Ubah">
@@ -143,7 +143,7 @@
     </template>
 
     {{-- Modal tambah/ubah user --}}
-    <div x-show="showModal && $store.auth.isSuperadmin" x-cloak
+    <div x-show="showModal && $store.auth.can('users.manage')" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0"
@@ -242,7 +242,7 @@
     </div>
 
     {{-- Modal import user via Excel: khusus superadmin --}}
-    <div x-show="showImportModal && $store.auth.isSuperadmin" x-cloak
+    <div x-show="showImportModal && $store.auth.can('users.manage')" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0"

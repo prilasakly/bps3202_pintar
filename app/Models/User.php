@@ -60,4 +60,49 @@ class User extends Authenticatable
     {
         return $this->hasRole('superadmin');
     }
+
+    /**
+     * Semua slug permission yang dimiliki user ini lewat role-role-nya (gabungan,
+     * tanpa duplikat). Dipakai di AuthApiController supaya dikirim ke frontend
+     * (Alpine store "auth") dan dipakai di EnsureHasPermission middleware.
+     *
+     * @return array<int, string>
+     */
+    public function permissionSlugs(): array
+    {
+        return $this->roles()
+            ->with('permissions:slug')
+            ->get()
+            ->flatMap(fn (Role $role) => $role->permissions->pluck('slug'))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Cek apakah user punya permission tertentu (lewat salah satu role-nya).
+     * BEDA dengan hasRole(): permission ini datanya 100% dari database (tabel
+     * permissions + permission_role), jadi bisa diubah lewat halaman "Kelola Hak
+     * Akses" tanpa ubah kode. Superadmin selalu dianggap punya semua permission,
+     * supaya superadmin tidak bisa "mengunci dirinya sendiri" secara tidak sengaja.
+     *
+     * Contoh: $user->hasPermission('users.manage'), $user->hasPermission(['data.manage', 'data.upload']).
+     *
+     * (Sengaja dinamai hasPermission(), bukan can(), supaya tidak menimpa method can()
+     * bawaan Laravel dari trait Authorizable yang dipakai sistem Gate/Policy.)
+     */
+    public function hasPermission(string|array $permissions): bool
+    {
+        if ($this->isSuperadmin()) {
+            return true;
+        }
+
+        $permissions = is_array($permissions) ? $permissions : [$permissions];
+
+        return $this->roles()
+            ->whereHas('permissions', function ($q) use ($permissions) {
+                $q->whereIn('slug', $permissions);
+            })
+            ->exists();
+    }
 }

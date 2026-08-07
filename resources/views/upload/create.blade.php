@@ -48,15 +48,15 @@
             </div>
         </template>
 
-        <template x-if="$store.auth.isLoggedIn && !$store.auth.isIpds">
+        <template x-if="$store.auth.isLoggedIn && !$store.auth.can('data.upload')">
             <div class="p-5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm shrink-0">
                 Akun Anda (<span x-text="$store.auth.roles.join(', ')"></span>) tidak memiliki akses untuk mengupload data.
-                Hanya tim <strong>IPDS</strong> yang bisa mengelola data indikator.
+                Hak akses ini diatur lewat halaman <strong>Kelola Hak Akses</strong> (superadmin).
             </div>
         </template>
 
         {{-- KARTU PUTIH: Diberi 'flex-1 flex flex-col justify-between' agar kotaknya ditarik penuh ke bawah --}}
-        <div x-show="$store.auth.isIpds" x-cloak
+        <div x-show="$store.auth.can('data.upload')" x-cloak
              class="w-full flex-1 bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm flex flex-col justify-between"
              x-data="{
                  subsidebars: {{ Illuminate\Support\Js::from($subsidebarOptions) }},

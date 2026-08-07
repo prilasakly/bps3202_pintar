@@ -26,6 +26,12 @@
             $initialOpenMenus[(string) $s->id] = true;
         }
     }
+
+    // Kelompokkan menu utama per "grup" (judul header seksi di sidebar: General, Statistik,
+    // Internal, dst). groupBy() mempertahankan urutan kemunculan pertama tiap grup, dan
+    // $navSidebars sendiri sudah diurutkan lewat kolom "urutan" -- jadi urutan seksi & menu
+    // di dalamnya 100% ikut apa yang di database, tidak di-hardcode di sini.
+    $menuPerGrup = $navSidebars->groupBy(fn ($s) => $s->grup ?: 'General');
 @endphp
 
 <aside class="h-full w-80 lg:w-72 bg-white border-r border-slate-200 flex flex-col select-none"
@@ -64,90 +70,100 @@
 
     <nav class="flex-1 overflow-y-auto custom-scrollbar px-4 py-4 space-y-1 text-sm">
 
-        {{-- Menu utama: 100% dari database (sidebars), urut sesuai kolom "urutan" --}}
-        <div x-show="!search.trim()" class="space-y-1">
-            @foreach ($navSidebars as $menu)
-                @if ($menu->isDropdown())
-                    {{-- Menu dropdown, contoh: "Data Makro" -> daftar kategori (subsidebar) -> indikator --}}
-                    <div>
-                        <button type="button" @click="openMenus['{{ $menu->id }}'] = !openMenus['{{ $menu->id }}']"
-                                class="w-full group relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl font-medium transition-all
-                                       {{ $activeSubsidebarId ? 'bg-bps-green-50 text-bps-green-700 font-semibold' : 'text-slate-600 hover:bg-slate-50' }}">
-                            <span class="flex items-center gap-3">
-                                @include('partials.icon', ['icon' => $menu->icon, 'class' => 'w-5 h-5 '.($activeSubsidebarId ? 'text-bps-green-600' : 'text-slate-400 group-hover:text-bps-green-600')])
-                                <span>{{ $menu->nama }}</span>
-                            </span>
-                            <svg :class="openMenus['{{ $menu->id }}'] ? 'rotate-180 text-bps-green-600' : 'text-slate-400'"
-                                 class="w-3.5 h-3.5 transition-transform duration-200 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </button>
+        {{-- Menu utama: 100% dari database (sidebars), dikelompokkan per grup lalu diurutkan sesuai kolom "urutan" --}}
+        <div x-show="!search.trim()" class="space-y-5">
+            @foreach ($menuPerGrup as $namaGrup => $menuList)
+                <div class="space-y-1">
+                    <p class="px-3 text-[10px] font-bold tracking-widest text-slate-400 uppercase">{{ $namaGrup }}</p>
 
-                        <div x-show="openMenus['{{ $menu->id }}']" x-cloak
-                             x-transition:enter="transition ease-out duration-150"
-                             x-transition:enter-start="opacity-0 -translate-y-1"
-                             x-transition:enter-end="opacity-100 translate-y-0"
-                             class="pl-4 ml-5 border-l border-slate-200 space-y-1 my-1">
-                            @foreach ($menu->subsidebars as $sub)
-                                <div>
-                                    <button type="button" @click="openGroups['{{ $sub->id }}'] = !openGroups['{{ $sub->id }}']"
-                                            class="w-full group flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-all
-                                                   {{ $activeSubsidebarId === $sub->id ? 'text-bps-green-700' : 'text-slate-600 hover:bg-slate-50' }}">
-                                        <span class="flex items-center gap-2.5 text-left">
-                                            <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ $activeSubsidebarId === $sub->id ? 'bg-bps-orange-500' : 'bg-slate-300' }}"></span>
-                                            <span class="text-[13px]">{{ $sub->nama }}</span>
-                                        </span>
-                                        <span class="flex items-center gap-1.5 shrink-0">
-                                            <span class="text-[10px] text-slate-400">{{ $sub->indikators_count }}</span>
-                                            <svg :class="openGroups['{{ $sub->id }}'] ? 'rotate-180 text-bps-green-600' : 'text-slate-400'"
-                                                 class="w-3.5 h-3.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                                            </svg>
-                                        </span>
-                                    </button>
+                    @foreach ($menuList as $menu)
+                        @if ($menu->isDropdown())
+                            {{-- Menu dropdown, contoh: "Data Makro" -> daftar kategori (subsidebar) -> indikator --}}
+                            <div>
+                                <button type="button" @click="openMenus['{{ $menu->id }}'] = !openMenus['{{ $menu->id }}']"
+                                        class="w-full group relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl font-medium transition-all
+                                               {{ $activeSubsidebarId ? 'bg-bps-green-50 text-bps-green-700 font-semibold' : 'text-slate-600 hover:bg-slate-50' }}">
+                                    <span class="flex items-center gap-3">
+                                        @include('partials.icon', ['icon' => $menu->icon, 'class' => 'w-5 h-5 '.($activeSubsidebarId ? 'text-bps-green-600' : 'text-slate-400 group-hover:text-bps-green-600')])
+                                        <span>{{ $menu->nama }}</span>
+                                    </span>
+                                    <svg :class="openMenus['{{ $menu->id }}'] ? 'rotate-180 text-bps-green-600' : 'text-slate-400'"
+                                         class="w-3.5 h-3.5 transition-transform duration-200 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </button>
 
-                                    <div x-show="openGroups['{{ $sub->id }}']" x-cloak
-                                         x-transition:enter="transition ease-out duration-150"
-                                         x-transition:enter-start="opacity-0 -translate-y-1"
-                                         x-transition:enter-end="opacity-100 translate-y-0"
-                                         class="pl-5 ml-4 border-l border-slate-200 space-y-0.5 my-1">
-                                        @forelse ($sub->indikators as $indikator)
-                                            <a href="{{ route('indikator.show', $indikator) }}"
-                                               class="block px-3 py-1.5 rounded-lg text-xs leading-snug transition-colors
-                                                      {{ $currentIndikator?->id === $indikator->id
-                                                          ? 'text-bps-green-700 font-semibold bg-bps-green-50'
-                                                          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50' }}">
-                                                {{ $indikator->nama_judul }}
-                                            </a>
-                                        @empty
-                                            <p class="px-3 py-1.5 text-xs text-slate-400 italic">Belum ada indikator.</p>
-                                        @endforelse
-                                    </div>
+                                <div x-show="openMenus['{{ $menu->id }}']" x-cloak
+                                     x-transition:enter="transition ease-out duration-150"
+                                     x-transition:enter-start="opacity-0 -translate-y-1"
+                                     x-transition:enter-end="opacity-100 translate-y-0"
+                                     class="pl-4 ml-5 border-l border-slate-200 space-y-1 my-1">
+                                    @foreach ($menu->subsidebars as $sub)
+                                        <div>
+                                            <button type="button" @click="openGroups['{{ $sub->id }}'] = !openGroups['{{ $sub->id }}']"
+                                                    class="w-full group flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-all
+                                                           {{ $activeSubsidebarId === $sub->id ? 'text-bps-green-700' : 'text-slate-600 hover:bg-slate-50' }}">
+                                                <span class="flex items-center gap-2.5 text-left">
+                                                    <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ $activeSubsidebarId === $sub->id ? 'bg-bps-orange-500' : 'bg-slate-300' }}"></span>
+                                                    <span class="text-[13px]">{{ $sub->nama }}</span>
+                                                </span>
+                                                <span class="flex items-center gap-1.5 shrink-0">
+                                                    <span class="text-[10px] text-slate-400">{{ $sub->indikators_count }}</span>
+                                                    <svg :class="openGroups['{{ $sub->id }}'] ? 'rotate-180 text-bps-green-600' : 'text-slate-400'"
+                                                         class="w-3.5 h-3.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                                    </svg>
+                                                </span>
+                                            </button>
+
+                                            <div x-show="openGroups['{{ $sub->id }}']" x-cloak
+                                                 x-transition:enter="transition ease-out duration-150"
+                                                 x-transition:enter-start="opacity-0 -translate-y-1"
+                                                 x-transition:enter-end="opacity-100 translate-y-0"
+                                                 class="pl-5 ml-4 border-l border-slate-200 space-y-0.5 my-1">
+                                                @forelse ($sub->indikators as $indikator)
+                                                    <a href="{{ route('indikator.show', $indikator) }}"
+                                                       class="block px-3 py-1.5 rounded-lg text-xs leading-snug transition-colors
+                                                              {{ $currentIndikator?->id === $indikator->id
+                                                                  ? 'text-bps-green-700 font-semibold bg-bps-green-50'
+                                                                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50' }}">
+                                                        {{ $indikator->nama_judul }}
+                                                    </a>
+                                                @empty
+                                                    <p class="px-3 py-1.5 text-xs text-slate-400 italic">Belum ada indikator.</p>
+                                                @endforelse
+                                            </div>
+                                        </div>
+                                    @endforeach
                                 </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @else
-                    {{-- Menu link biasa, contoh: "Beranda", "Buku Tamu", "Tautan Penting" --}}
-                    @php
-                        $isActive = $menu->route_name && request()->routeIs($menu->route_name);
-                        // "Tautan Penting" & "Kelola User" sengaja disembunyikan dari guest (belum
-                        // login) -- lihat permintaan RBAC: guest tidak menampilkan menu ini. Status
-                        // login dicek di client (Alpine store "auth") karena auth aplikasi ini murni
-                        // via token API, bukan session server.
-                        $wajibLogin = in_array($menu->slug, ['tautan-penting', 'kelola-user']);
-                    @endphp
-                    <a href="{{ $menu->href() }}"
-                       @if ($wajibLogin) x-show="$store.auth.isLoggedIn" x-cloak @endif
-                       class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all
-                              {{ $isActive ? 'bg-bps-green-50 text-bps-green-700 font-semibold' : 'text-slate-600 hover:bg-slate-50' }}">
-                        @if ($isActive)
-                            <span class="absolute left-0 top-2 bottom-2 w-1 bg-bps-green-500 rounded-r-full"></span>
+                            </div>
+                        @else
+                            {{-- Menu link biasa, contoh: "Beranda", "Buku Tamu", "Kelola Data", "Tautan Penting" --}}
+                            @php
+                                $isActive = $menu->route_name && request()->routeIs($menu->route_name);
+                                // Menu-menu ini sengaja disembunyikan dari guest (belum login) -- status
+                                // login dicek di client (Alpine store "auth") karena auth aplikasi ini murni
+                                // via token API, bukan session server.
+                                $wajibLogin = in_array($menu->slug, ['tautan-penting', 'kelola-data', 'kelola-user', 'kelola-hak-akses']);
+                                // "Kelola Hak Akses" sengaja KHUSUS superadmin dan dicek langsung di sini
+                                // (bukan lewat sistem permission yang justru diatur dari halaman ini),
+                                // supaya tidak ada risiko superadmin "mengunci diri sendiri".
+                                $khususSuperadmin = $menu->slug === 'kelola-hak-akses';
+                            @endphp
+                            <a href="{{ $menu->href() }}"
+                               @if ($khususSuperadmin) x-show="$store.auth.isSuperadmin" x-cloak
+                               @elseif ($wajibLogin) x-show="$store.auth.isLoggedIn" x-cloak @endif
+                               class="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all
+                                      {{ $isActive ? 'bg-bps-green-50 text-bps-green-700 font-semibold' : 'text-slate-600 hover:bg-slate-50' }}">
+                                @if ($isActive)
+                                    <span class="absolute left-0 top-2 bottom-2 w-1 bg-bps-green-500 rounded-r-full"></span>
+                                @endif
+                                @include('partials.icon', ['icon' => $menu->icon, 'class' => 'w-5 h-5 '.($isActive ? 'text-bps-green-600' : 'text-slate-400 group-hover:text-bps-green-600')])
+                                <span>{{ $menu->nama }}</span>
+                            </a>
                         @endif
-                        @include('partials.icon', ['icon' => $menu->icon, 'class' => 'w-5 h-5 '.($isActive ? 'text-bps-green-600' : 'text-slate-400 group-hover:text-bps-green-600')])
-                        <span>{{ $menu->nama }}</span>
-                    </a>
-                @endif
+                    @endforeach
+                </div>
             @endforeach
         </div>
 

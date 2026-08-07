@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             SubsidebarSeeder::class,
             IndikatorSeeder::class,
             RoleSeeder::class,
+            PermissionSeeder::class,
             UserSeeder::class,
         ]);
     }

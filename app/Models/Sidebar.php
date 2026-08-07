@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Sidebar extends Model
 {
-    protected $fillable = ['nama', 'slug', 'icon', 'type', 'route_name', 'url', 'urutan'];
+    protected $fillable = ['nama', 'grup', 'slug', 'icon', 'type', 'route_name', 'url', 'urutan'];
 
     public function subsidebars(): HasMany
     {

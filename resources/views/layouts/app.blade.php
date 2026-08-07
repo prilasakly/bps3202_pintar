@@ -39,6 +39,11 @@
                 token: localStorage.getItem('pintar_token'),
                 user: JSON.parse(localStorage.getItem('pintar_user') || 'null'),
                 roles: JSON.parse(localStorage.getItem('pintar_roles') || '[]'),
+                // Daftar slug permission (dari tabel permissions lewat role-role user ini,
+                // dikirim oleh AuthApiController). INILAH yang bikin visibilitas halaman/
+                // tombol bisa diatur dari halaman "Kelola Hak Akses" (web) tanpa ubah kode --
+                // beda dengan "roles" di atas yang tetap/hardcoded di database seeder.
+                permissions: JSON.parse(localStorage.getItem('pintar_permissions') || '[]'),
                 loading: false,
                 error: '',
 
@@ -60,6 +65,17 @@
 
                 get isSuperadmin() {
                     return this.hasRole('superadmin');
+                },
+
+                // Cek permission (BUKAN nama role) -- pakai ini untuk mengatur tampil/
+                // tidaknya halaman atau tombol yang aksesnya ingin bisa diubah lewat
+                // halaman "Kelola Hak Akses", tanpa perlu ubah kode. Contoh pakai di Blade:
+                //   x-show="$store.auth.can('data.manage')"
+                // Terima satu slug ('data.manage') atau beberapa (array, OR -- salah satu
+                // cukup): ['data.manage', 'data.upload'].
+                can(permission) {
+                    const perms = Array.isArray(permission) ? permission : [permission];
+                    return this.isSuperadmin || perms.some((p) => this.permissions.includes(p));
                 },
 
                 async login(email, password) {
@@ -103,18 +119,22 @@
                     this.token = token;
                     this.user = user;
                     this.roles = user.roles || [];
+                    this.permissions = user.permissions || [];
                     localStorage.setItem('pintar_token', token);
                     localStorage.setItem('pintar_user', JSON.stringify(user));
                     localStorage.setItem('pintar_roles', JSON.stringify(this.roles));
+                    localStorage.setItem('pintar_permissions', JSON.stringify(this.permissions));
                 },
 
                 clearSession() {
                     this.token = null;
                     this.user = null;
                     this.roles = [];
+                    this.permissions = [];
                     localStorage.removeItem('pintar_token');
                     localStorage.removeItem('pintar_user');
                     localStorage.removeItem('pintar_roles');
+                    localStorage.removeItem('pintar_permissions');
                 },
             });
         });
@@ -430,8 +450,9 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0" x-data="{ userMenuOpen: false }">
-                    {{-- Upload Data: cuma tampil buat user yang login dan berperan ipds --}}
-                    <a href="{{ route('upload.create') }}" x-cloak x-show="$store.auth.isIpds"
+                    {{-- Upload Data: cuma tampil buat user yang punya permission "data.upload"
+                         (default role ipds, bisa diubah lewat halaman Kelola Hak Akses) --}}
+                    <a href="{{ route('upload.create') }}" x-cloak x-show="$store.auth.can('data.upload')"
                        class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-bps-green-500 text-white text-xs font-semibold hover:bg-bps-green-600 active:scale-[0.98] transition shadow-sm">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />

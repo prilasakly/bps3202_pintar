@@ -13,4 +13,13 @@ class Role extends Model
     {
         return $this->belongsToMany(User::class);
     }
+
+    /**
+     * Hak akses (permission) yang dimiliki role ini. Diatur lewat halaman
+     * "Kelola Hak Akses" (lihat PermissionApiController), bukan lewat kode.
+     */
+    public function permissions(): BelongsToMany
+    {
+        return $this->belongsToMany(Permission::class);
+    }
 }

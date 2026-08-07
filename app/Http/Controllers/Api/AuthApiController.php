@@ -42,7 +42,7 @@ class AuthApiController extends Controller
         return response()->json(['message' => 'Berhasil logout.']);
     }
 
-    /** Info user yang sedang login + role-nya. Dipakai frontend untuk restore sesi saat reload/buka app. */
+    /** Info user yang sedang login + role & permission-nya. Dipakai frontend untuk restore sesi saat reload/buka app. */
     public function me(Request $request)
     {
         return response()->json([
@@ -57,6 +57,14 @@ class AuthApiController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'roles' => $user->roles()->pluck('slug'),
+            // Daftar slug permission (dari tabel permissions, lewat role-role user ini) --
+            // dipakai Alpine store "auth" (lihat layouts/app.blade.php) untuk method can(),
+            // supaya visibilitas halaman/tombol bisa diatur dari halaman Kelola Hak Akses
+            // tanpa ubah kode. Superadmin selalu dapat semua slug yang ada (lihat
+            // User::permissionSlugs() & hasPermission()).
+            'permissions' => $user->isSuperadmin()
+                ? \App\Models\Permission::pluck('slug')
+                : $user->permissionSlugs(),
         ];
     }
 }
